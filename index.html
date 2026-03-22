@@ -699,31 +699,12 @@ function fmtShort(d){return d.toLocaleDateString('es-ES',{day:'numeric',month:'s
 const fmtEur = n => n.toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
 
 // ── DATA ──
-let obras = [
-  {id:1,nombre:"Reforma baño Muntaner",cliente:"Família García",estado:"En curso",progreso:65,dir:"Carrer de Muntaner, 45, Barcelona"},
-  {id:2,nombre:"Cocina nova Gràcia",cliente:"Ana Puig",estado:"Pendiente",progreso:0,dir:"Carrer de Verdi, 12, Barcelona"},
-];
-let tareas = [
-  {id:1,obraId:1,texto:"Instalar nova fontanería",done:false},
-  {id:2,obraId:1,texto:"Alicatar paredes",done:false},
-  {id:3,obraId:2,texto:"Pedir presupuesto muebles",done:false},
-];
-let operarios = [
-  {id:1,obraId:1,nombre:"Manel",precioh:25},
-  {id:2,obraId:1,nombre:"Jordi",precioh:22},
-];
-let moList = [
-  {id:1,obraId:1,fecha:"2026-03-10",operario:"Manel",desc:"Demolición azulejos",horas:4,precioh:25},
-  {id:2,obraId:1,fecha:"2026-03-12",operario:"Jordi",desc:"Fontanería",horas:3,precioh:22},
-];
-let matList = [
-  {id:1,obraId:1,fecha:"2026-03-11",nombre:"Azulejos 60x60",cantidad:12,unidad:"m²",precioU:32},
-  {id:2,obraId:1,fecha:"2026-03-13",nombre:"Cemento cola",cantidad:5,unidad:"sac",precioU:18},
-];
-let partidas = [
-  {id:1,obraId:1,nombre:"Mano de obra estimada",tipo:"mo",importe:500},
-  {id:2,obraId:1,nombre:"Materiales estimados",tipo:"mat",importe:600},
-];
+let obras = [];
+let tareas = [];
+let operarios = [];
+let moList = [];
+let matList = [];
+let partidas = [];
 const CATS = [
   {id:'demolicion',    label:'Demoliciones',             color:'#71717A'},
   {id:'instalaciones', label:'Instalaciones',             color:'#2563EB'},
@@ -736,31 +717,13 @@ const CATS = [
   {id:'iluminacion',   label:'Iluminación',               color:'#B45309'},
   {id:'mecanismos',    label:'Mecanismos',                color:'#312E81'},
 ];
-let planTareas = [
-  {id:1,obraId:1,cat:'demolicion',nombre:'Retirar alicatado',fechaIni:'2026-03-16',fechaFin:'2026-03-17',done:true},
-  {id:2,obraId:1,cat:'instalaciones',nombre:'Nueva fontanería',fechaIni:'2026-03-18',fechaFin:'2026-03-21',done:false},
-  {id:3,obraId:1,cat:'alicatados',nombre:'Alicatar paredes',fechaIni:'2026-03-23',fechaFin:'2026-03-26',done:false},
-  {id:4,obraId:1,cat:'pavimentos',nombre:'Colocar pavimento',fechaIni:'2026-03-25',fechaFin:'2026-03-28',done:false},
-  {id:5,obraId:1,cat:'sanitarios',nombre:'Instalar plato ducha',fechaIni:'2026-03-28',fechaFin:'2026-03-29',done:false},
-  {id:6,obraId:1,cat:'pintura',nombre:'Pintura techo',fechaIni:'2026-03-30',fechaFin:'2026-03-31',done:false},
-];
-let compras = [
-  {id:1,obraId:1,nombre:"Rejilla desagüe 60cm",cantidad:2,unidad:"ud",operario:"Manel",urgente:true,comprado:false,fecha:"2026-03-17"},
-  {id:2,obraId:1,nombre:"Silicona blanca sanitaria",cantidad:3,unidad:"ud",operario:"Manel",urgente:false,comprado:false,fecha:"2026-03-17"},
-];
+let planTareas = [];
+let compras = [];
 let fotos = [];
-let contactos = [
-  {id:1,obraId:1,nombre:"Manel Fontaner",tipo:"operario",telefono:"612345678",oficio:"Alicatador"},
-  {id:2,obraId:1,nombre:"Família García",tipo:"cliente",telefono:"678901234",oficio:""},
-];
-let gastosGenerales = [
-  {id:1,fecha:"2026-03-05",concepto:"Gasoil furgoneta",cat:"combustible",importe:80},
-  {id:2,fecha:"2026-03-10",concepto:"Disco amoladora",cat:"herramientas",importe:35},
-];
-let facturas = [
-  {id:1,tipo:"email",nombre:"Factura ferreteria Martí",fecha:"2026-03-15",src:null},
-];
-let nObraId=3,nTareaId=4,nOpId=3,nMoId=3,nMatId=3,nPartId=3,nPlanId=7,nCompraId=3,nConId=3,nGGId=3,nFactId=2;
+let contactos = [];
+let gastosGenerales = [];
+let facturas = [];
+let nObraId=1,nTareaId=1,nOpId=1,nMoId=1,nMatId=1,nPartId=1,nPlanId=1,nCompraId=1,nConId=1,nGGId=1,nFactId=1;
 
 const ggCats = {
   maquinaria:{label:"Maquinaria",bg:"#EFF4FF",color:"#2563EB"},
