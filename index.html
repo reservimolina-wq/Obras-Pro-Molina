@@ -6,6 +6,8 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
 <title>ObrasPro</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
 :root {
   --bg: #F4F2ED;
@@ -271,7 +273,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="shell">
 <!-- SIDEBAR -->
 <nav class="sidebar">
-  <div class="sidebar-logo"><span>Obras<em>Pro</em></span></div>
+  <div class="sidebar-logo">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Obras<em>Pro</em></span>
+      <div id="sync-dot" title="Sincronizado" style="width:8px;height:8px;border-radius:50%;background:#16A34A;margin-left:8px;flex-shrink:0;"></div>
+    </div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:3px;">☁️ Sync en la nube</div>
+  </div>
   <div class="nav-item active" onclick="showView('v-obras',this)" data-view="v-obras">
     <span class="nav-icon">🏗️</span> Obras activas
   </div>
@@ -1473,9 +1481,7 @@ function borrarTodo(){
   nPlanId=1;nCompraId=1;nConId=1;nGGId=1;nFactId=1;nFactRegId=1;
   try{localStorage.removeItem('obraspro_v1');}catch(e){}
   guardarDatos();
-  cm();
-  renderHome();
-  renderDatosInfo();
+  cm();renderHome();renderDatosInfo();
 }
 
 // ── PARTE SEMANAL ──
@@ -1856,20 +1862,20 @@ function recalcFactura(){
   if(ti)ti.value=total||'';
 }
 
-// ── GUARDADO AUTOMÁTICO ──
-const STORAGE_KEY = 'obraspro_v1';
+// ── FIREBASE SYNC ──
+const firebaseConfig = {
+  apiKey: "AIzaSyBY7EJnhmtkYK-GJY75hEwbTVAqV97Ae_k",
+  authDomain: "obraspro-b5df6.firebaseapp.com",
+  projectId: "obraspro-b5df6",
+  storageBucket: "obraspro-b5df6.firebasestorage.app",
+  messagingSenderId: "440858365127",
+  appId: "1:440858365127:web:dc628b23b97abd654ec2e2"
+};
 
-function guardarDatos() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      obras, tareas, operarios, moList, matList, partidas,
-      planTareas, compras, contactos, gastosGenerales, facturas,
-      parteData, facturaReg,
-      nObraId, nTareaId, nOpId, nMoId, nMatId, nPartId,
-      nPlanId, nCompraId, nConId, nGGId, nFactId, nFactRegId
-    }));
-  } catch(e) { console.warn('No se pudo guardar:', e); }
-}
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const docRef = db.collection('obraspro').doc('datos');
+let guardando = false;
 
 function getDatos(){
   return {
@@ -1883,55 +1889,74 @@ function getDatos(){
 
 function aplicarDatos(d){
   if(!d) return false;
-  obras = d.obras || [];
-  tareas = d.tareas || [];
-  operarios = d.operarios || [];
-  moList = d.moList || [];
-  matList = d.matList || [];
-  partidas = d.partidas || [];
-  planTareas = d.planTareas || [];
-  compras = d.compras || [];
-  contactos = d.contactos || [];
-  gastosGenerales = d.gastosGenerales || [];
+  obras = d.obras||[]; tareas = d.tareas||[]; operarios = d.operarios||[];
+  moList = d.moList||[]; matList = d.matList||[]; partidas = d.partidas||[];
+  planTareas = d.planTareas||[]; compras = d.compras||[]; contactos = d.contactos||[];
+  gastosGenerales = d.gastosGenerales||[];
   facturas = (d.facturas||[]).map(f=>({...f,src:f.tipo==='email'?null:f.src}));
-  parteData = d.parteData || {};
-  facturaReg = d.facturaReg || [];
-  nFactRegId = d.nFactRegId || 1;
-  nObraId = d.nObraId || 1;
-  nTareaId = d.nTareaId || 1;
-  nOpId = d.nOpId || 1;
-  nMoId = d.nMoId || 1;
-  nMatId = d.nMatId || 1;
-  nPartId = d.nPartId || 1;
-  nPlanId = d.nPlanId || 1;
-  nCompraId = d.nCompraId || 1;
-  nConId = d.nConId || 1;
-  nGGId = d.nGGId || 1;
-  nFactId = d.nFactId || 1;
+  parteData = d.parteData||{}; facturaReg = d.facturaReg||[];
+  nFactRegId=d.nFactRegId||1; nObraId=d.nObraId||1; nTareaId=d.nTareaId||1;
+  nOpId=d.nOpId||1; nMoId=d.nMoId||1; nMatId=d.nMatId||1; nPartId=d.nPartId||1;
+  nPlanId=d.nPlanId||1; nCompraId=d.nCompraId||1; nConId=d.nConId||1;
+  nGGId=d.nGGId||1; nFactId=d.nFactId||1;
   return true;
 }
 
-function cargarDatos() {
+function mostrarSync(ok){
+  const el=document.getElementById('sync-dot');
+  if(!el) return;
+  el.style.background = ok ? '#16A34A' : '#D97706';
+  el.title = ok ? 'Sincronizado' : 'Guardando...';
+}
+
+async function guardarDatos(){
+  // Guardar siempre en localStorage como respaldo inmediato
+  try { localStorage.setItem('obraspro_v1', JSON.stringify(getDatos())); } catch(e){}
+  // Guardar en Firebase
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    return aplicarDatos(JSON.parse(raw));
-  } catch(e) { console.warn('No se pudo cargar:', e); return false; }
+    guardando = true;
+    mostrarSync(false);
+    await docRef.set(getDatos());
+    mostrarSync(true);
+  } catch(e) {
+    console.warn('Firebase error:', e);
+    mostrarSync(false);
+  } finally { guardando = false; }
 }
 
-// INIT
-const hayDatos = cargarDatos();
-renderHome();
+// Escuchar cambios en tiempo real
+docRef.onSnapshot(snap => {
+  if(snap.exists && !guardando){
+    aplicarDatos(snap.data());
+    const v = document.querySelector('.view.active')?.id;
+    if(v==='v-obras') renderHome();
+    else if(v==='v-terminadas') renderTerminadas();
+    else if(v==='v-gg') renderGG();
+    mostrarSync(true);
+  }
+}, err => console.warn('Snapshot error:', err));
 
-if(!hayDatos){
-  setTimeout(()=>{
-    const b=document.createElement('div');
-    b.style.cssText='position:fixed;bottom:1rem;right:1rem;background:#1C1B18;color:white;padding:.75rem 1.25rem;border-radius:10px;font-size:13px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.2);';
-    b.textContent='💾 Guardado automático activado';
-    document.body.appendChild(b);
-    setTimeout(()=>b.remove(),3000);
-  },500);
-}
+// INIT — cargar desde Firebase, fallback a localStorage
+docRef.get().then(snap => {
+  if(snap.exists){
+    aplicarDatos(snap.data());
+  } else {
+    // Primera vez — intentar migrar desde localStorage
+    try {
+      const raw = localStorage.getItem('obraspro_v1');
+      if(raw){ aplicarDatos(JSON.parse(raw)); guardarDatos(); }
+    } catch(e){}
+  }
+  renderHome();
+  mostrarSync(true);
+}).catch(err => {
+  console.warn('Firebase carga error, usando localStorage:', err);
+  try {
+    const raw = localStorage.getItem('obraspro_v1');
+    if(raw) aplicarDatos(JSON.parse(raw));
+  } catch(e){}
+  renderHome();
+});
 
 // ── ASISTENTE DE VOZ ──
 let recognition = null;
