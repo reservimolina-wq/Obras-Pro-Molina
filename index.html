@@ -271,7 +271,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <div class="shell">
 <!-- SIDEBAR -->
 <nav class="sidebar">
-  <div class="sidebar-logo"><span>Obras<em>Pro</em></span></div>
+  <div class="sidebar-logo">
+    <span>Obras<em>Pro</em></span>
+    <div id="sync-indicator" style="font-size:11px;color:var(--text3);margin-top:4px;">☁️ En la nube</div>
+  </div>
   <div class="nav-item active" onclick="showView('v-obras',this)" data-view="v-obras">
     <span class="nav-icon">🏗️</span> Obras activas
   </div>
@@ -684,7 +687,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <!-- MODAL -->
 <div id="modal-root"></div>
 
-<script>
+<script type="module">
 const TODAY = new Date(2026,2,17);
 let currentObraId = null, conFiltro = 'todos', buzonFiltro = 'todas';
 let planWeekStart = mondayOf(TODAY);
@@ -1391,14 +1394,7 @@ function renderDatosInfo(){
 }
 
 function exportarDatos(){
-  const data={
-    version:1,
-    fecha:new Date().toISOString(),
-    obras,tareas,operarios,moList,matList,partidas,
-    planTareas,compras,contactos,gastosGenerales,
-    nObraId,nTareaId,nOpId,nMoId,nMatId,nPartId,
-    nPlanId,nCompraId,nConId,nGGId,nFactId
-  };
+  const data={version:1,fecha:new Date().toISOString(),...getDatos()};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -1445,7 +1441,7 @@ function importarDatos(e){
       if(msg){
         msg.style.display='block';
         msg.style.color='var(--green)';
-        msg.textContent=`✓ Datos importados correctamente — ${obras.length} obras recuperadas.`;
+        msg.textContent=`✓ Datos importados y sincronizados en la nube — ${obras.length} obras recuperadas.`;
       }
     }catch(err){
       const msg=document.getElementById('import-msg');
@@ -1473,11 +1469,13 @@ function confirmarBorrarTodo(){
 }
 
 function borrarTodo(){
-  localStorage.removeItem(STORAGE_KEY);
   obras=[];tareas=[];operarios=[];moList=[];matList=[];partidas=[];
   planTareas=[];compras=[];fotos=[];contactos=[];gastosGenerales=[];facturas=[];
+  facturaReg=[];parteData={};
   nObraId=1;nTareaId=1;nOpId=1;nMoId=1;nMatId=1;nPartId=1;
-  nPlanId=1;nCompraId=1;nConId=1;nGGId=1;nFactId=1;
+  nPlanId=1;nCompraId=1;nConId=1;nGGId=1;nFactId=1;nFactRegId=1;
+  try{localStorage.removeItem('obraspro_v1');}catch(e){}
+  guardarDatos();
   cm();
   renderHome();
   renderDatosInfo();
@@ -1861,70 +1859,146 @@ function recalcFactura(){
   if(ti)ti.value=total||'';
 }
 
-// ── GUARDADO AUTOMÁTICO ──
-const STORAGE_KEY = 'obraspro_v1';
+// ── FIREBASE + GUARDADO EN LA NUBE ──
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-function guardarDatos() {
+const firebaseConfig = {
+  apiKey: "AIzaSyBY7EJnhmtkYK-GJY75hEwbTVAqV97Ae_k",
+  authDomain: "obraspro-b5df6.firebaseapp.com",
+  projectId: "obraspro-b5df6",
+  storageBucket: "obraspro-b5df6.firebasestorage.app",
+  messagingSenderId: "440858365127",
+  appId: "1:440858365127:web:dc628b23b97abd654ec2e2"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const DOC_ID = 'datos';
+const COL = 'obraspro';
+
+let guardandoEnNube = false;
+let escuchandoCambios = false;
+
+function getDatos(){
+  return {
+    obras, tareas, operarios, moList, matList, partidas,
+    planTareas, compras, contactos, gastosGenerales, facturas,
+    parteData, facturaReg,
+    nObraId, nTareaId, nOpId, nMoId, nMatId, nPartId,
+    nPlanId, nCompraId, nConId, nGGId, nFactId, nFactRegId
+  };
+}
+
+function aplicarDatos(d){
+  if(!d) return false;
+  obras = d.obras || [];
+  tareas = d.tareas || [];
+  operarios = d.operarios || [];
+  moList = d.moList || [];
+  matList = d.matList || [];
+  partidas = d.partidas || [];
+  planTareas = d.planTareas || [];
+  compras = d.compras || [];
+  contactos = d.contactos || [];
+  gastosGenerales = d.gastosGenerales || [];
+  facturas = (d.facturas||[]).map(f=>({...f,src:f.tipo==='email'?null:f.src}));
+  parteData = d.parteData || {};
+  facturaReg = d.facturaReg || [];
+  nFactRegId = d.nFactRegId || 1;
+  nObraId = d.nObraId || 1;
+  nTareaId = d.nTareaId || 1;
+  nOpId = d.nOpId || 1;
+  nMoId = d.nMoId || 1;
+  nMatId = d.nMatId || 1;
+  nPartId = d.nPartId || 1;
+  nPlanId = d.nPlanId || 1;
+  nCompraId = d.nCompraId || 1;
+  nConId = d.nConId || 1;
+  nGGId = d.nGGId || 1;
+  nFactId = d.nFactId || 1;
+  return true;
+}
+
+// Guardar en Firestore + localStorage como respaldo
+async function guardarDatos(){
+  const datos = getDatos();
+  // Siempre guardar en localStorage como respaldo
+  try { localStorage.setItem('obraspro_v1', JSON.stringify(datos)); } catch(e){}
+  // Guardar en Firestore
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      obras, tareas, operarios, moList, matList, partidas,
-      planTareas, compras, contactos, gastosGenerales, facturas,
-      parteData, facturaReg,
-      nObraId, nTareaId, nOpId, nMoId, nMatId, nPartId,
-      nPlanId, nCompraId, nConId, nGGId, nFactId, nFactRegId
-    }));
-  } catch(e) { console.warn('No se pudo guardar:', e); }
+    guardandoEnNube = true;
+    await setDoc(doc(db, COL, DOC_ID), datos);
+    mostrarSyncOK();
+  } catch(e) {
+    console.warn('Error guardando en nube:', e);
+  } finally {
+    guardandoEnNube = false;
+  }
 }
 
-function cargarDatos() {
+function mostrarSyncOK(){
+  const el = document.getElementById('sync-indicator');
+  if(el){ el.textContent='☁️ Sincronizado'; el.style.color='var(--green)'; setTimeout(()=>{ el.textContent='☁️ En la nube'; el.style.color='var(--text3)'; }, 2000); }
+}
+
+// Escuchar cambios en tiempo real (sincronización entre dispositivos)
+function iniciarEscucha(){
+  if(escuchandoCambios) return;
+  escuchandoCambios = true;
+  onSnapshot(doc(db, COL, DOC_ID), (snap)=>{
+    if(snap.exists() && !guardandoEnNube){
+      aplicarDatos(snap.data());
+      // Re-renderizar vista activa
+      const vActiva = document.querySelector('.view.active')?.id;
+      if(vActiva==='v-obras') renderHome();
+      else if(vActiva==='v-detalle' && currentObraId){
+        const tabActiva = document.querySelector('#obra-tabs .tab.active');
+        if(tabActiva) goTab(tabActiva.textContent.toLowerCase().trim().replace('ó','o'), tabActiva);
+      }
+    }
+  });
+}
+
+// Cargar datos al iniciar
+async function cargarDatos(){
+  // Primero intentar desde Firestore
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    const d = JSON.parse(raw);
-    obras = d.obras || obras;
-    tareas = d.tareas || tareas;
-    operarios = d.operarios || operarios;
-    moList = d.moList || moList;
-    matList = d.matList || matList;
-    partidas = d.partidas || partidas;
-    planTareas = d.planTareas || planTareas;
-    compras = d.compras || compras;
-    contactos = d.contactos || contactos;
-    gastosGenerales = d.gastosGenerales || gastosGenerales;
-    facturas = (d.facturas || []).map(f => ({...f, src: f.tipo==='email' ? null : f.src}));
-    parteData = d.parteData || {};
-    facturaReg = d.facturaReg || [];
-    nFactRegId = d.nFactRegId || 1;
-    nObraId = d.nObraId || nObraId;
-    nTareaId = d.nTareaId || nTareaId;
-    nOpId = d.nOpId || nOpId;
-    nMoId = d.nMoId || nMoId;
-    nMatId = d.nMatId || nMatId;
-    nPartId = d.nPartId || nPartId;
-    nPlanId = d.nPlanId || nPlanId;
-    nCompraId = d.nCompraId || nCompraId;
-    nConId = d.nConId || nConId;
-    nGGId = d.nGGId || nGGId;
-    nFactId = d.nFactId || nFactId;
-    return true;
-  } catch(e) { console.warn('No se pudo cargar:', e); return false; }
+    const snap = await getDoc(doc(db, COL, DOC_ID));
+    if(snap.exists()){
+      aplicarDatos(snap.data());
+      iniciarEscucha();
+      return true;
+    }
+  } catch(e){ console.warn('Error cargando desde nube, usando localStorage:', e); }
+  // Fallback a localStorage
+  try {
+    const raw = localStorage.getItem('obraspro_v1');
+    if(raw){
+      aplicarDatos(JSON.parse(raw));
+      // Subir a Firestore
+      await guardarDatos();
+      iniciarEscucha();
+      return true;
+    }
+  } catch(e){}
+  iniciarEscucha();
+  return false;
 }
 
-
-// INIT — cargar datos guardados o usar datos de ejemplo
-const hayDatosGuardados = cargarDatos();
-renderHome();
-
-// Mostrar indicador si es primera vez
-if (!hayDatosGuardados) {
-  setTimeout(()=>{
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;bottom:1rem;right:1rem;background:#1C1B18;color:white;padding:.75rem 1.25rem;border-radius:10px;font-size:13px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.2);';
-    banner.textContent = '💾 Guardado automático activado';
-    document.body.appendChild(banner);
-    setTimeout(()=>banner.remove(), 3000);
-  }, 500);
-}
+// INIT
+cargarDatos().then(hayDatos => {
+  renderHome();
+  if(!hayDatos){
+    setTimeout(()=>{
+      const b=document.createElement('div');
+      b.style.cssText='position:fixed;bottom:1rem;right:1rem;background:#1C1B18;color:white;padding:.75rem 1.25rem;border-radius:10px;font-size:13px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.2);';
+      b.textContent='☁️ Sincronización en la nube activada';
+      document.body.appendChild(b);
+      setTimeout(()=>b.remove(),3500);
+    },500);
+  }
+});
 
 // ── ASISTENTE DE VOZ ──
 let recognition = null;
